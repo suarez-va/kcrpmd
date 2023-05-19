@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 import os
-sys.path.append('/storage/home/hcoda1/8/vsuarez6/kcrpmd_5.18.2023')
+sys.path.append('/storage/home/hcoda1/8/vsuarez6/repos/kcrpmd')
 import kcrpmd_system as KcrpmdSystem
 from kcrpmd import Kcrpmd
 
