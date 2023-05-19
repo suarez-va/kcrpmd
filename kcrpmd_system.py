@@ -69,7 +69,11 @@ class KcrpmdSystem(ABC):
         else:
             print("ERROR: theta should be -1, 0, or 1 !!! >:( ")
             exit()
-        return 1 / (ltheta * (1 + np.exp(self.b * (2 * abs(y - theta) - ltheta))))
+        exp_arg = self.b * (2 * abs(y - theta) - ltheta)
+        if exp_arg > 0.:
+            return np.exp(-exp_arg) / (ltheta * (1 + np.exp(-exp_arg)))
+        else:
+            return 1 / (ltheta * (1 + np.exp(exp_arg)))
 
     def w(self, R):
         return (self.V0(R) - self.V1(R)) / self.K(R)
