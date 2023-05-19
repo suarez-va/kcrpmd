@@ -106,7 +106,7 @@ class KcrpmdSystem(ABC):
             return self.b / (2 * ltheta * np.cosh(self.b * (abs(y - theta) - ltheta / 2.))**2)
 
     def dg(self, R):
-        return 2 * self.a * self.g(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R)) / self.K(R)
+        return 2 * self.a * self.g(R) * self.w(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R)) / self.K(R)
 
     def dphi(self, R):
         return self.beta * ((self.F0(R) + self.F1(R)) * np.cosh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4)) - (self.w(R) * (self.F0(R) - self.F1(R)) + 4 * self.FK(R)) / np.sqrt(self.w(R)**2 + 4) * np.sinh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4))) * np.exp(-self.beta / 2 * (self.V0(R) + self.V1(R))) - self.beta * self.F0(R) * np.exp(-self.beta * self.V0(R)) - self.beta * self.F1(R) * np.exp(-self.beta * self.V1(R))
