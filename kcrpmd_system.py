@@ -183,14 +183,17 @@ class SystemA(KcrpmdSystem):
 
     def V1s(self,s):
         return 0.5 * self.ms * self.omegas**2 * (s - self.s1)**2 + self.epsilon
-    
+
     def phis(self,s):
         return 2 * np.cosh(self.beta / 2 * np.sqrt((self.V0s(s) - self.V1s(s))**2 + 4 * self.Delta**2)) * np.exp(-self.beta / 2 * (self.V0s(s) + self.V1s(s))) - np.exp(-self.beta * self.V0s(s)) - np.exp(-self.beta * self.V1s(s))
 
-    def P(self, s, y):
+    def Psy(self, s, y):
         return np.sqrt(self.a / np.pi) * self.eta * self.f(y, 0) * np.exp(-self.a * ((self.V0s(s) - self.V1s(s))/self.Delta)**2) * self.phis(s) + self.f(y, -1) * np.exp(-self.beta * self.V0s(s)) + self.f(y, 1) * np.exp(-self.beta * self.V1s(s))
     
     def TST_Rate(self):
-        
-        
-### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ###
+        nsigma = 5.
+        s_low = self.s0 - nsigma / np.sqrt(self.beta * self.ms * self.omegas**2); s_high = self.s1 + nsigma / np.sqrt(self.beta * self.ms * self.omegas**2)
+        P = quad(self.Psy, s_low, s_high, args=(0.))[0]
+        Q = dblquad(self.Psy, -3., 0., s_low, s_high)[0]
+        return 1 / np.sqrt(2 * np.pi * self.beta * self.my) * P / Q
+
