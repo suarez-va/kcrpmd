@@ -1,5 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
+from scipy.integrate import quad, dblquad
 
 # Classical Lmimit Build
 class KcrpmdSystem(ABC):
@@ -44,6 +45,10 @@ class KcrpmdSystem(ABC):
 
     @abstractmethod
     def kinked_pair_R(self):
+        pass
+
+    @abstractmethod
+    def TST_Rate(self):
         pass
 
 ##############################################################
@@ -172,3 +177,20 @@ class SystemA(KcrpmdSystem):
         R[:-1] = self.cj * sdagger / (self.M * self.omegaj**2)
         R[-1] = sdagger
         return R
+
+    def V0s(self,s):
+        return 0.5 * self.ms * self.omegas**2 * (s - self.s0)**2
+
+    def V1s(self,s):
+        return 0.5 * self.ms * self.omegas**2 * (s - self.s1)**2 + self.epsilon
+    
+    def phis(self,s):
+        return 2 * np.cosh(self.beta / 2 * np.sqrt((self.V0s(s) - self.V1s(s))**2 + 4 * self.Delta**2)) * np.exp(-self.beta / 2 * (self.V0s(s) + self.V1s(s))) - np.exp(-self.beta * self.V0s(s)) - np.exp(-self.beta * self.V1s(s))
+
+    def P(self, s, y):
+        return np.sqrt(self.a / np.pi) * self.eta * self.f(y, 0) * np.exp(-self.a * ((self.V0s(s) - self.V1s(s))/self.Delta)**2) * self.phis(s) + self.f(y, -1) * np.exp(-self.beta * self.V0s(s)) + self.f(y, 1) * np.exp(-self.beta * self.V1s(s))
+    
+    def TST_Rate(self):
+        
+        
+### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ### ADD ###
