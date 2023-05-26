@@ -112,7 +112,7 @@ class Kcrpmd():
             if(self.resample_vel and np.mod(step, self.Ntemp) == 0):
                 self.resample_vR()
             if(np.mod(step, self.Nprint) == 0):
-                print(f"PRINTING!!! --> t = {currtime}, y = {self.y}, Fy = {self.Fy}, f(y,-1) = {self.sys.f(self.y,-1)}, f(y,0) = {self.sys.f(self.y,0)}, f(y,1) = {self.sys.f(self.y,1)}")
+                print(f"PRINTING!!! --> t = {currtime}")
                 self.print_data(currtime)
             self.integrate()
 
