@@ -78,14 +78,16 @@ class KcrpmdSystem(ABC):
     def w(self, R):
         return (self.V0(R) - self.V1(R)) / self.K(R)
 
-    def g(self, R):
-        return np.sqrt(self.a / np.pi) * self.eta * np.exp(-self.a * self.w(R)**2)
+# np.sqrt(self.a / np.pi) * self.eta * np.exp(-self.a * self.w(R)**2)
 
     def phi(self, R):
         return 2 * np.cosh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4)) * np.exp(-self.beta / 2 * (self.V0(R) + self.V1(R))) - np.exp(-self.beta * self.V0(R)) - np.exp(-self.beta * self.V1(R))
 
+    def VKP(self, R):
+        return -1 / self.beta * np.log(self.eta * np.sqrt(self.a / np.pi) * self.phi(R)) + self.a / self.beta * self.w(R)**2
+
     def VKC(self, y, R):
-        return -1 / self.beta * np.log(self.f(y, 0) * self.g(R) * self.phi(R) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R)))
+        return -1 / self.beta * np.log(self.f(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R)))
 
 ##############################################################
 # KC-RPMD - force functions
@@ -105,11 +107,13 @@ class KcrpmdSystem(ABC):
         else:
             return self.b / (2 * ltheta * np.cosh(self.b * (abs(y - theta) - ltheta / 2.))**2)
 
-    def dg(self, R):
-        return 2 * self.a * self.g(R) * self.w(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R)) / self.K(R)
+# 2 * self.a * self.g(R) * self.w(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R)) / self.K(R)
 
     def dphi(self, R):
         return self.beta * ((self.F0(R) + self.F1(R)) * np.cosh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4)) - (self.w(R) * (self.F0(R) - self.F1(R)) + 4 * self.FK(R)) / np.sqrt(self.w(R)**2 + 4) * np.sinh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4))) * np.exp(-self.beta / 2 * (self.V0(R) + self.V1(R))) - self.beta * self.F0(R) * np.exp(-self.beta * self.V0(R)) - self.beta * self.F1(R) * np.exp(-self.beta * self.V1(R))
+
+    def FKP(self, R):
+        return 1 / (self.beta * self.phi(R)) * self.dphi(R) + 2 * self.a * self.w(R) / (self.beta * self.K(R)) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R))
 
     def FKCy(self, y, R):
         return (self.g(R) * self.phi(R) * self.df(y, 0) + np.exp(-self.beta * self.V0(R)) * self.df(y, -1) + np.exp(-self.beta * self.V1(R)) * self.df(y, 1)) / (self.beta * (self.f(y, 0) * self.g(R) * self.phi(R) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R))))
