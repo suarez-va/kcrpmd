@@ -116,10 +116,10 @@ class KcrpmdSystem(ABC):
         return 1 / (self.beta * self.phi(R)) * self.dphi(R) + 2 * self.a * self.w(R) / (self.beta * self.K(R)) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R))
 
     def FKCy(self, y, R):
-        return (self.g(R) * self.phi(R) * self.df(y, 0) + np.exp(-self.beta * self.V0(R)) * self.df(y, -1) + np.exp(-self.beta * self.V1(R)) * self.df(y, 1)) / (self.beta * (self.f(y, 0) * self.g(R) * self.phi(R) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R))))
+        return (self.df(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.df(y, -1) * np.exp(-self.beta * self.V0(R)) + self.df(y, 1) * np.exp(-self.beta * self.V1(R))) / (self.beta * (self.f(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R))))
 
     def FKCR(self, y, R):
-        return (self.f(y, 0) * (self.phi(R) * self.dg(R) + self.g(R) * self.dphi(R)) + self.beta * self.f(y, -1) * self.F0(R) * np.exp(-self.beta * self.V0(R)) + self.beta * self.f(y, 1) * self.F1(R) * np.exp(-self.beta * self.V1(R))) / (self.beta * (self.f(y, 0) * self.g(R) * self.phi(R) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R))))
+        return (self.f(y, 0) * self.FKP(R) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * self.F0(R) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * self.F1(R) * np.exp(-self.beta * self.V1(R))) / (self.f(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R)))
 
 ##############################################################
 
