@@ -176,3 +176,85 @@ class SystemA(KcrpmdSystem):
         R[:-1] = self.cj * sdagger / (self.M * self.omegaj**2)
         R[-1] = sdagger
         return R
+
+####### NEW ADDED SYSTEM A TST RATE #######
+
+    def V0s(self,s):
+        return 0.5 * self.ms * self.omegas**2 * (s - self.s0)**2
+
+    def V1s(self,s):
+        return 0.5 * self.ms * self.omegas**2 * (s - self.s1)**2 + self.epsilon
+
+    def ws(self, s):
+        return (self.V0s(s) - self.V1s(s)) / self.Delta
+    
+    def phis(self,s):
+        return 2 * np.cosh(self.beta * self.Delta / 2 * np.sqrt(self.ws(s)**2 + 4)) * np.exp(-self.beta / 2 * (self.V0s(s) + self.V1s(s))) - np.exp(-self.beta * self.V0s(s)) - np.exp(-self.beta * self.V1s(s))
+
+    def VKPs(self, s):
+        return -1 / self.beta * np.log(self.eta * np.sqrt(self.a / np.pi) * self.phis(s)) + self.a / self.beta * self.ws(s)**2
+    
+    def rhosy(self, s, y):
+        return self.f(y, 0) * np.exp(-self.beta * self.VKPs(s)) + self.f(y, -1) * np.exp(-self.beta * self.V0s(s)) + self.f(y, 1) * np.exp(-self.beta * self.V1s(s))
+        
+    def rhoy(self, y):
+        points_s = 10000
+        n_sdev = 10.
+
+        sigma_s = 1 / np.sqrt(self.beta * self.ms * self.omegas**2)
+        sKP = 1 / 2 * (self.s0 + self.s1) - self.epsilon / (self.ms * self.omegas**2 * (self.s0 - self.s1))
+        sigma_KP = self.Delta / (np.sqrt(2 * self.a) * self.ms * self.omegas**2 * (self.s0 - self.s1))
+
+        lower_bound = min(self.s0, self.s1) - n_sdev * sigma_s
+        upper_bound = max(self.s0, self.s1) + n_sdev * sigma_s
+        
+        lower_bound_KP = sKP - n_sdev * sigma_KP
+        upper_bound_KP = sKP + n_sdev * sigma_KP
+        
+        rhoy = 0.
+        
+        if lower_bound_KP < lower_bound:
+            s_ar = np.linspace(lower_bound_KP, upper_bound_KP, points_s)
+            rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+            s_ar = np.linspace(upper_bound_KP, upper_bound, points_s)
+            rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+        else:
+            if lower_bound_KP < upper_bound:
+                s_ar = np.linspace(lower_bound, lower_bound_KP, points_s)
+                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+                s_ar = np.linspace(lower_bound_KP, upper_bound_KP, points_s)
+                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+                if upper_bound_KP < upper_bound:
+                    s_ar = np.linspace(upper_bound_KP, upper_bound, points_s)
+                    rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+            else:
+                s_ar = np.linspace(lower_bound, lower_bound_KP, points_s)
+                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+                s_ar = np.linspace(lower_bound_KP, upper_bound_KP, points_s)
+                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+
+        return rhoy
+
+    def Fsy(self, s, y):
+        return -1 / self.beta * np.log(self.rhosy(s,y))
+
+    def Fy(self, y_ar):
+        Fy_ar = np.zeros(len(y_ar))
+        for i in range(len(y_ar)):
+            Fy_ar[i] = -1 / self.beta * np.log(self.rhoy(y_ar[i]))
+
+        return Fy_ar
+    
+    def TST_Rate(self):
+        points_y = 10000
+        y_ar = np.linspace(-2., 0., points_y)
+        
+        rhoy_ar = np.zeros(len(y_ar))
+        
+        for i in range(len(y_ar)):
+            rhoy_ar[i] = self.rhoy(y_ar[i])
+        
+        return 1 / np.sqrt(2 * np.pi * self.beta * self.my) * self.rhoy(0.) / np.trapz(rhoy_ar, y_ar)
+    
+    def TST_Rate_analytic(self):
+        return 2 * self.eta * self.Delta * np.sinh(self.beta * self.Delta / 2)**2 / (np.pi * np.sqrt(self.my * self.L**2) * np.sqrt(self.ms * self.omegas**2 * (self.s0 - self.s1)**2)) * np.exp(-1 / 2 * self.beta * self.ms * self.omegas**2 * (1 / 2 * (self.s0 - self.s1) + self.epsilon / (self.ms * self.omegas**2 * (self.s0 - self.s1)))**2)
