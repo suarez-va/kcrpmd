@@ -1,11 +1,12 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-# Classical Lmimit Build
+# Classical + Quantum Nuclear Build
 class KcrpmdSystem(ABC):
 
     @abstractmethod
-    def __init__(self, beta, a, b, L, eta, my, sysparam):
+    def __init__(self, nbeads, beta, a, b, L, eta, my, sysparam):
+        self.set_nbeads(nbeads)
         self.beta = beta
         self.a = a
         self.b = b
@@ -13,6 +14,18 @@ class KcrpmdSystem(ABC):
         self.eta = eta
         self.my = my
         self.sysparam = sysparam
+
+    def set_nbeads(self, nbeads):
+        self.classical_limit = False
+        self.nbeads = nbeads
+        if self.nbeads == 1:
+            self.classical_limit = True
+
+    def set_dnuclei(self, dnuclei):
+        self.dnuclei = dnuclei
+
+    def set_Vref(self, Vref):
+        self.Vref = Vref
 
     @abstractmethod
     def set_mR(self):
@@ -55,77 +68,149 @@ class KcrpmdSystem(ABC):
     def sample_vR(self):
         return np.random.normal(scale = 1. / np.sqrt(self.beta * self.mR))
 
-    def TKC(self, vy, vR):
+    def TKCRPMD(self, vy, vR):
         return 0.5 * self.my * vy**2 + np.sum(0.5 * self.mR * vR**2)
     
 ##############################################################
 # KC-RPMD - potential energy functions
 
-    def f(self, y, theta):
-        if theta == -1 or theta == 1:
-            ltheta = 2. - self.L
-        elif theta == 0:
-            ltheta = self.L
+    def Uint(self, R):
+        if self.classical_limit:
+            return 0.
         else:
-            print("ERROR: theta should be -1, 0, or 1 !!! >:( ")
-            exit()
-        exp_arg = self.b * (2 * abs(y - theta) - ltheta)
-        if exp_arg > 0.:
-            return np.exp(-exp_arg) / (ltheta * (1 + np.exp(-exp_arg)))
-        else:
-            return 1 / (ltheta * (1 + np.exp(exp_arg)))
+            return np.sum(1 / 2 * self.mR * (self.nbeads / self.beta)**2 * (R - np.concatenate((R[:,1:], R[:,:1]), axis=1))**2)
 
     def w(self, R):
-        return (self.V0(R) - self.V1(R)) / self.K(R)
+        if self.classical_limit:
+            w = (self.V0(R) - self.V1(R)) / self.K(R)
+        else:
+            Rbar = np.average(R, axis=1)
+            w = (self.V0(Rbar) - self.V1(Rbar)) / self.K(Rbar)
+        return w
 
-# np.sqrt(self.a / np.pi) * self.eta * np.exp(-self.a * self.w(R)**2)
+    def f(self, y, theta):
+        if theta == 0:
+            ltheta = self.L
+        else:
+            ltheta = 2 - self.L
+        hyperbolic_arg = self.b * (abs(y - theta) - ltheta / 2)
+        if hyperbolic_arg < 0.:
+            return 1 / (ltheta * (1 + np.exp(2 * hyperbolic_arg)))
+        else:
+            return np.exp(-2 * hyperbolic_arg) / (ltheta * (1 + np.exp(-2 * hyperbolic_arg)))
 
-    def phi(self, R):
-        return 2 * np.cosh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4)) * np.exp(-self.beta / 2 * (self.V0(R) + self.V1(R))) - np.exp(-self.beta * self.V0(R)) - np.exp(-self.beta * self.V1(R))
+    def M(self, R):
+        return np.array([[np.exp(-self.beta / self.nbeads * self.V0(R)), -self.beta / self.nbeads * self.K(R) * np.exp(-self.beta / self.nbeads * self.V0(R))], [-self.beta / self.nbeads * self.K(R) * np.exp(-self.beta / self.nbeads * self.V1(R)), np.exp(-self.beta / self.nbeads * self.V1(R))]])
 
-    def VKP(self, R):
-        return -1 / self.beta * np.log(self.eta * np.sqrt(self.a / np.pi) * self.phi(R)) + self.a / self.beta * self.w(R)**2
+    def Gamma(self, R):
+        if self.classical_limit:
+            Gamma = 1 / 2 * (self.V0(R) + self.V1(R)) - 1 / self.beta * np.log(2 * np.cosh(self.beta / 2 * np.sqrt((self.V0(R) - self.V1(R))**2 + 4 * self.K(R)**2)))
+        else:
+            PiM = self.M(R[:,0])
+            for i in range(1, self.nbeads):
+                PiM = np.matmul(PiM, self.M(R[:,i]))
+            Gamma = -1 / self.beta * np.log(np.trace(PiM))
+        return Gamma
 
-    def VKC(self, y, R):
-        return -1 / self.beta * np.log(self.f(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R)))
+    def U0(self, R):
+        if self.classical_limit:
+            U0 = self.V0(R)
+        else:
+            U0 = np.sum(1 / self.nbeads * np.array([self.V0(R[:, i]) for i in range(self.nbeads)]))
+        return U0
+
+    def U1(self, R):
+        if self.classical_limit:
+            U1 = self.V1(R)
+        else:
+            U1 = np.sum(1 / self.nbeads * np.array([self.V1(R[:, i]) for i in range(self.nbeads)]))
+        return U1
+
+    def UKP(self, R):
+        return -1 / self.beta * np.log(self.eta * np.sqrt(self.a / np.pi) * (np.exp(-self.beta * self.Gamma(R)) - np.exp(-self.beta * self.U0(R)) - np.exp(-self.beta * self.U1(R)))) + self.a / self.beta * self.w(R)**2
+
+    def rhoKC(self, y, R):
+        return self.f(y, 0) * np.exp(-self.beta * self.UKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.U0(R)) + self.f(y, 1) * np.exp(-self.beta * self.U1(R))
+    
+    def VKCRPMD(self, y, R):
+        return -self.Vref + self.Uint(R) -1 / self.beta * np.log(self.f(y, 0) * np.exp(-self.beta * self.UKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.U0(R)) + self.f(y, 1) * np.exp(-self.beta * self.U1(R)))
 
 ##############################################################
 # KC-RPMD - force functions
 
+    def dUint(self, R):
+        if self.classical_limit:
+            return 0.
+        else:
+            return self.mR * (self.nbeads / self.beta)**2 * (2 * R - np.concatenate((R[:,-1:], R[:,:-1]), axis=1) - np.concatenate((R[:,1:], R[:,:1]), axis=1))
+
+    def dw(self, R):
+        if self.classical_limit:
+            dw = -1 / self.K(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R))
+        else:
+            Rbar = np.average(R, axis=1)
+            dw = np.tile(-1 / (self.nbeads * self.K(Rbar)) * (self.F0(Rbar) - self.F1(Rbar) - self.w(R) * self.FK(Rbar)), (self.nbeads, 1)).T
+        return dw
+
     def df(self, y, theta):
-        if theta == -1 or theta == 1:
-            ltheta = 2. - self.L
-        elif theta == 0:
+        if theta == 0:
             ltheta = self.L
         else:
-            print("ERROR: theta should be -1, 0, or 1 !!! >:( ")
-            exit() 
-        if abs(self.b * (abs(y - theta) - ltheta / 2.)) > 200.:
+            ltheta = 2. - self.L 
+        hyperbolic_arg = self.b * (abs(y - theta) - ltheta / 2)
+        if abs(hyperbolic_arg) > 250.:
             return 0.
         elif y > theta:
-            return -self.b / (2 * ltheta * np.cosh(self.b * (abs(y - theta) - ltheta / 2.))**2)
+            return -self.b / (2 * ltheta * np.cosh(hyperbolic_arg)**2)
         else:
-            return self.b / (2 * ltheta * np.cosh(self.b * (abs(y - theta) - ltheta / 2.))**2)
+            return self.b / (2 * ltheta * np.cosh(hyperbolic_arg)**2)
 
-# 2 * self.a * self.g(R) * self.w(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R)) / self.K(R)
+    def dM(self, R):
+        return np.array([[self.beta / self.nbeads * self.F0(R) * np.exp(-self.beta / self.nbeads * self.V0(R)), -self.beta / self.nbeads * (self.beta / self.nbeads * self.K(R) * self.F0(R) - self.FK(R)) * np.exp(-self.beta / self.nbeads * self.V0(R))], [-self.beta / self.nbeads * (self.beta / self.nbeads * self.K(R) * self.F1(R) - self.FK(R)) * np.exp(-self.beta / self.nbeads * self.V1(R)), self.beta / self.nbeads * self.F1(R) * np.exp(-self.beta / self.nbeads * self.V1(R))]])
+    
+    def dGamma(self, R):
+        if self.classical_limit:
+            dGamma = -1 / 2 * (self.F0(R) + self.F1(R)) + (((self.V0(R) - self.V1(R)) * (self.F0(R) - self.F1(R)) + 4 * self.K(R) * self.FK(R)) / (2 * np.sqrt((self.V0(R) - self.V1(R))**2 + 4 * self.K(R)**2))) * np.tanh(self.beta / 2 * np.sqrt((self.V0(R) - self.V1(R))**2 + 4 * self.K(R)**2))
+        else:
+            Fbell = np.zeros((self.nbeads, 2, 2)); Fbell[0] = np.eye(2)
+            Gbell = np.zeros((self.nbeads, 2, 2)); Gbell[-1] = np.eye(2)
+            for i in range(1, self.nbeads):
+                Fbell[i] = np.matmul(Fbell[i - 1], self.M(R[:, i - 1]))
+                Gbell[self.nbeads - 1 - i] = np.matmul(self.M(R[:, self.nbeads - i]), Gbell[self.nbeads - i])
+            dGamma = np.zeros((self.dnuclei, self.nbeads))
+            PiM = np.matmul(self.M(R[:, 0]), Gbell[0])
+            for i in range(self.nbeads):
+                dGamma[:,i] = -1 / self.beta * np.trace(np.einsum('ijk,jl->ilk', self.dM(R[:, i]), np.matmul(Gbell[i], Fbell[i]))) / np.trace(PiM)
+        return dGamma
 
-    def dphi(self, R):
-        return self.beta * ((self.F0(R) + self.F1(R)) * np.cosh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4)) - (self.w(R) * (self.F0(R) - self.F1(R)) + 4 * self.FK(R)) / np.sqrt(self.w(R)**2 + 4) * np.sinh(self.beta / 2 * self.K(R) * np.sqrt(self.w(R)**2 + 4))) * np.exp(-self.beta / 2 * (self.V0(R) + self.V1(R))) - self.beta * self.F0(R) * np.exp(-self.beta * self.V0(R)) - self.beta * self.F1(R) * np.exp(-self.beta * self.V1(R))
+    def dU0(self, R):
+        if self.classical_limit:
+            dU0 = -self.F0(R)
+        else:
+            dU0 = -1 / self.nbeads * np.array([self.F0(R[:, i]) for i in range(self.nbeads)]).T
+        return dU0
+    
+    def dU1(self, R):
+        if self.classical_limit:
+            dU1 = -self.F1(R)
+        else:
+            dU1 = -1 / self.nbeads * np.array([self.F1(R[:, i]) for i in range(self.nbeads)]).T
+        return dU1
 
-    def FKP(self, R):
-        return 1 / (self.beta * self.phi(R)) * self.dphi(R) + 2 * self.a * self.w(R) / (self.beta * self.K(R)) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R))
+    def dUKP(self, R):
+        return (self.dGamma(R) * np.exp(-self.beta * self.Gamma(R)) - self.dU0(R) * np.exp(-self.beta * self.U0(R)) - self.dU1(R) * np.exp(-self.beta * self.U1(R))) / (np.exp(-self.beta * self.Gamma(R)) - np.exp(-self.beta * self.U0(R)) - np.exp(-self.beta * self.U1(R))) + 2 * self.a / self.beta * self.w(R) * self.dw(R)
 
-    def FKCy(self, y, R):
-        return (self.df(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.df(y, -1) * np.exp(-self.beta * self.V0(R)) + self.df(y, 1) * np.exp(-self.beta * self.V1(R))) / (self.beta * (self.f(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R))))
+    def FKCRPMD_y(self, y, R):
+        return (self.df(y, 0) * np.exp(-self.beta * self.UKP(R)) + self.df(y, -1) * np.exp(-self.beta * self.U0(R)) + self.df(y, 1) * np.exp(-self.beta * self.U1(R))) / (self.beta * (self.f(y, 0) * np.exp(-self.beta * self.UKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.U0(R)) + self.f(y, 1) * np.exp(-self.beta * self.U1(R))))
 
-    def FKCR(self, y, R):
-        return (self.f(y, 0) * self.FKP(R) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * self.F0(R) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * self.F1(R) * np.exp(-self.beta * self.V1(R))) / (self.f(y, 0) * np.exp(-self.beta * self.VKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.V0(R)) + self.f(y, 1) * np.exp(-self.beta * self.V1(R)))
+    def FKCRPMD_R(self, y, R):
+        return -self.dUint(R) - (self.f(y, 0) * self.dUKP(R) * np.exp(-self.beta * self.UKP(R)) + self.f(y, -1) * self.dU0(R) * np.exp(-self.beta * self.U0(R)) + self.f(y, 1) * self.dU1(R) * np.exp(-self.beta * self.U1(R))) / (self.f(y, 0) * np.exp(-self.beta * self.UKP(R)) + self.f(y, -1) * np.exp(-self.beta * self.U0(R)) + self.f(y, 1) * np.exp(-self.beta * self.U1(R)))
 
 ##############################################################
 
 class SystemA(KcrpmdSystem):
-    def __init__(self, beta, a, b, L, eta, my, sysparam):
-        super().__init__(beta, a, b, L, eta, my, sysparam)
+    def __init__(self, nbeads, beta, a, b, L, eta, my, sysparam):
+        super().__init__(nbeads, beta, a, b, L, eta, my, sysparam)
 
         self.ms = sysparam[0]
         self.omegas = sysparam[1]
@@ -133,128 +218,69 @@ class SystemA(KcrpmdSystem):
         self.s1 = sysparam[3]
         self.epsilon = sysparam[4]
         self.Delta = sysparam[5]
-        self.M = sysparam[6]
+        self.mx= sysparam[6]
         self.omegac = sysparam[7]
         self.gamma = sysparam[8]
         self.fmodes = int(sysparam[9])
-
-        self.omegaj = -self.omegac * np.log((np.arange(self.fmodes) + 0.5) / self.fmodes)
-        self.cj = self.omegaj * np.sqrt(2 * self.gamma * self.M * self.omegac / (self.fmodes * np.pi))
+        
+        self.set_dnuclei(1 + self.fmodes)
         self.set_mR()
-
-    def set_mR(self):
-            mR = np.ones(self.fmodes + 1); mR *= self.M; mR[-1] = self.ms
-            self.mR = mR
+        
+        if self.fmodes > 0:
+            self.omegaj = -self.omegac * np.log((np.arange(self.fmodes) + 0.5) / self.fmodes)
+            self.cj = self.omegaj * np.sqrt(2 * self.gamma * self.mx* self.omegac / (self.fmodes * np.pi))
     
+    
+    def set_mR(self):
+        mR = np.ones(self.dnuclei); mR *= self.mx / self.nbeads; mR[-1] = self.ms / self.nbeads
+        if self.classical_limit:
+            self.mR = mR
+        else:
+            self.mR = np.tile(mR, (self.nbeads, 1)).T
+
     def V0(self, R):
-        return 0.5 * self.ms * self.omegas**2 * (R[-1] - self.s0)**2 + np.sum(0.5 * self.M * self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.M * self.omegaj**2))**2)
+        if self.fmodes > 0:
+            return self.Vref + 0.5 * self.ms * self.omegas**2 * (R[-1] - self.s0)**2 + np.sum(0.5 * self.mx* self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.mx* self.omegaj**2))**2)
+        else:
+            return self.Vref + 0.5 * self.ms * self.omegas**2 * (R[-1] - self.s0)**2
 
     def V1(self, R):
-        return 0.5 * self.ms * self.omegas**2 * (R[-1] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.M * self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.M * self.omegaj**2))**2)
+        if self.fmodes > 0:
+            return self.Vref + 0.5 * self.ms * self.omegas**2 * (R[-1] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.mx* self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.mx* self.omegaj**2))**2)
+        else:
+            return self.Vref + 0.5 * self.ms * self.omegas**2 * (R[-1] - self.s1)**2 + self.epsilon
 
     def K(self, R):
         return self.Delta
 
     def F0(self, R):
-        F = np.zeros(self.fmodes + 1)
-        F[:-1] = -self.M * self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.M * self.omegaj**2))
-        F[-1] = -self.ms * self.omegas**2 * (R[-1] - self.s0) + np.sum(self.cj * (R[:-1] - self.cj * R[-1] / (self.M * self.omegaj**2)))
+        F = np.zeros(self.dnuclei)
+        if self.fmodes > 0:
+            F[:-1] = -self.mx* self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.mx* self.omegaj**2))
+            F[-1] = -self.ms * self.omegas**2 * (R[-1] - self.s0) + np.sum(self.cj * (R[:-1] - self.cj * R[-1] / (self.mx* self.omegaj**2)))
+        else:
+            F[-1] = -self.ms * self.omegas**2 * (R[-1] - self.s0)
         return F
 
     def F1(self, R):
-        F = np.zeros(self.fmodes + 1)
-        F[:-1] = -self.M * self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.M * self.omegaj**2))
-        F[-1] = -self.ms * self.omegas**2 * (R[-1] - self.s1) + np.sum(self.cj * (R[:-1] - self.cj * R[-1] / (self.M * self.omegaj**2)))
+        F = np.zeros(self.dnuclei)
+        if self.fmodes > 0:
+            F[:-1] = -self.mx* self.omegaj**2 * (R[:-1] - self.cj * R[-1] / (self.mx* self.omegaj**2))
+            F[-1] = -self.ms * self.omegas**2 * (R[-1] - self.s1) + np.sum(self.cj * (R[:-1] - self.cj * R[-1] / (self.mx* self.omegaj**2)))
+        else:
+            F[-1] = -self.ms * self.omegas**2 * (R[-1] - self.s1)
         return F
 
     def FK(self, R):
-        return np.zeros(self.fmodes + 1)
+        return np.zeros(self.dnuclei)
 
     def kinked_pair_R(self):
         sdagger = 0.5 * (self.s0 + self.s1) - self.epsilon / (self.ms * self.omegas**2 * (self.s0 - self.s1))
-        R = np.zeros(self.fmodes + 1)
-        R[:-1] = self.cj * sdagger / (self.M * self.omegaj**2)
+        R = np.zeros(self.dnuclei)
         R[-1] = sdagger
-        return R
-
-####### NEW ADDED SYSTEM A TST RATE #######
-
-    def V0s(self,s):
-        return 0.5 * self.ms * self.omegas**2 * (s - self.s0)**2
-
-    def V1s(self,s):
-        return 0.5 * self.ms * self.omegas**2 * (s - self.s1)**2 + self.epsilon
-
-    def ws(self, s):
-        return (self.V0s(s) - self.V1s(s)) / self.Delta
-    
-    def phis(self,s):
-        return 2 * np.cosh(self.beta * self.Delta / 2 * np.sqrt(self.ws(s)**2 + 4)) * np.exp(-self.beta / 2 * (self.V0s(s) + self.V1s(s))) - np.exp(-self.beta * self.V0s(s)) - np.exp(-self.beta * self.V1s(s))
-
-    def VKPs(self, s):
-        return -1 / self.beta * np.log(self.eta * np.sqrt(self.a / np.pi) * self.phis(s)) + self.a / self.beta * self.ws(s)**2
-    
-    def rhosy(self, s, y):
-        return self.f(y, 0) * np.exp(-self.beta * self.VKPs(s)) + self.f(y, -1) * np.exp(-self.beta * self.V0s(s)) + self.f(y, 1) * np.exp(-self.beta * self.V1s(s))
-        
-    def rhoy(self, y):
-        points_s = 10000
-        n_sdev = 10.
-
-        sigma_s = 1 / np.sqrt(self.beta * self.ms * self.omegas**2)
-        sKP = 1 / 2 * (self.s0 + self.s1) - self.epsilon / (self.ms * self.omegas**2 * (self.s0 - self.s1))
-        sigma_KP = self.Delta / (np.sqrt(2 * self.a) * self.ms * self.omegas**2 * (self.s0 - self.s1))
-
-        lower_bound = min(self.s0, self.s1) - n_sdev * sigma_s
-        upper_bound = max(self.s0, self.s1) + n_sdev * sigma_s
-        
-        lower_bound_KP = sKP - n_sdev * sigma_KP
-        upper_bound_KP = sKP + n_sdev * sigma_KP
-        
-        rhoy = 0.
-        
-        if lower_bound_KP < lower_bound:
-            s_ar = np.linspace(lower_bound_KP, upper_bound_KP, points_s)
-            rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
-            s_ar = np.linspace(upper_bound_KP, upper_bound, points_s)
-            rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
+        if self.fmodes > 0:
+            R[:-1] = self.cj * sdagger / (self.mx* self.omegaj**2)
+        if self.classical_limit:
+            return R
         else:
-            if lower_bound_KP < upper_bound:
-                s_ar = np.linspace(lower_bound, lower_bound_KP, points_s)
-                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
-                s_ar = np.linspace(lower_bound_KP, upper_bound_KP, points_s)
-                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
-                if upper_bound_KP < upper_bound:
-                    s_ar = np.linspace(upper_bound_KP, upper_bound, points_s)
-                    rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
-            else:
-                s_ar = np.linspace(lower_bound, lower_bound_KP, points_s)
-                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
-                s_ar = np.linspace(lower_bound_KP, upper_bound_KP, points_s)
-                rhoy += np.trapz(self.rhosy(s_ar, y), s_ar)
-
-        return rhoy
-
-    def Fsy(self, s, y):
-        return -1 / self.beta * np.log(self.rhosy(s,y))
-
-    def Fy(self, y_ar):
-        Fy_ar = np.zeros(len(y_ar))
-        for i in range(len(y_ar)):
-            Fy_ar[i] = -1 / self.beta * np.log(self.rhoy(y_ar[i]))
-
-        return Fy_ar
-    
-    def TST_Rate(self):
-        points_y = 10000
-        y_ar = np.linspace(-2., 0., points_y)
-        
-        rhoy_ar = np.zeros(len(y_ar))
-        
-        for i in range(len(y_ar)):
-            rhoy_ar[i] = self.rhoy(y_ar[i])
-        
-        return 1 / np.sqrt(2 * np.pi * self.beta * self.my) * self.rhoy(0.) / np.trapz(rhoy_ar, y_ar)
-    
-    def TST_Rate_analytic(self):
-        return 2 * self.eta * self.Delta * np.sinh(self.beta * self.Delta / 2)**2 / (np.pi * np.sqrt(self.my * self.L**2) * np.sqrt(self.ms * self.omegas**2 * (self.s0 - self.s1)**2)) * np.exp(-1 / 2 * self.beta * self.ms * self.omegas**2 * (1 / 2 * (self.s0 - self.s1) + self.epsilon / (self.ms * self.omegas**2 * (self.s0 - self.s1)))**2)
+            return np.tile(R, (self.nbeads, 1)).T
