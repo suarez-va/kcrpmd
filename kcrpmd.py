@@ -3,7 +3,7 @@ import numpy as np
 # Classical Lmimit Build
 class Kcrpmd():
 
-    def __init__(self, sys, delt, Nstep, Nprint, langevin_nve=False, gammay=0., resample_vel=False, Ntemp=100, fix_y=False, set_y=-1.):
+    def __init__(self, sys, delt, Nstep, Nprint, langevin_nve=False, gammay=0., resample_vel=False, Ntemp=100, fix_y=False, set_y=-1., fix_s=False):
         self.sys = sys
         self.delt = delt
         self.Nstep = Nstep
@@ -13,8 +13,10 @@ class Kcrpmd():
         self.resample_vel = resample_vel
         self.Ntemp = Ntemp
         self.fix_y = fix_y
+        self.fix_s = fix_s
         self.y = set_y; self.vy = 0.; self.Fy = 0.
         self.R = self.sys.kinked_pair_R(); self.vR = np.zeros(self.R.shape[0]); self.FR = np.zeros(self.R.shape[0])
+        self.sdagger = self.R[0]
 
         self.file_output = open('output.dat', 'w')
         self.file_positions = open('positions.dat', 'w')
@@ -88,14 +90,22 @@ class Kcrpmd():
         if (self.langevin_nve):
             self.theta = np.random.normal()
             self.xi = np.random.normal()
-        
-        if (self.fix_y):
+        if (self.fix_y and self.fix_s):
+            print("WARNING: YOU'RE TRYING TO FIX BOTH y AND s!!!")        
+        elif (self.fix_y):
             self.vy = 0.; self.Fy = 0.
             self.get_vR()
             self.get_R()
             self.get_FR()
             self.get_vR()
-        else:
+        elif (self.fix_s):
+            self.R[0] = self.sdagger; self.vR[0] = 0.; self.FR[0] = 0.
+            self.get_vy(); self.get_vR()
+            self.get_y(); self.get_R()
+            self.get_Fy(); self.get_FR()
+            self.R[0] = self.sdagger; self.vR[0] = 0.; self.FR[0] = 0.
+            self.get_vy(); self.get_vR()
+       else:
             self.get_vy(); self.get_vR()
             self.get_y(); self.get_R()
             self.get_Fy(); self.get_FR()
