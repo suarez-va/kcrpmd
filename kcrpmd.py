@@ -112,9 +112,11 @@ class Kcrpmd():
             self.get_vy(); self.get_vR()
 
     def kernel(self):
-        initialization = np.zeros(3)
+        initialization = np.zeros(4)
         initialization[0] = self.y
         initialization[1] = self.vy
+        initialization[2] = self.R[0]
+        initialization[3] = self.vR[0]
         np.savetxt(self.file_initialization, initialization.reshape(1, initialization.shape[0]), '%20.8e')
         self.file_initialization.flush()
         for step in range(self.Nstep):
