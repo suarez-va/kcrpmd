@@ -37,7 +37,7 @@ class Kcrpmd():
             self.vy += 0.5 * self.delt * self.Fy / self.sys.my
 
     def get_Fy(self):
-        self.Fy = self.sys.FKCy(self.y, self.R)
+        self.Fy = self.sys.FKC_y(self.y, self.R)
 
     def resample_vy(self):
         self.vy = self.sys.sample_vy()
@@ -51,7 +51,7 @@ class Kcrpmd():
         self.vR += 0.5 * self.delt * self.FR / self.sys.mR
 
     def get_FR(self):
-        self.FR = self.sys.FKCR(self.y, self.R)
+        self.FR = self.sys.FKC_R(self.y, self.R)
 
     def resample_vR(self):
         self.vR = self.sys.sample_vR()
@@ -105,7 +105,7 @@ class Kcrpmd():
             self.get_Fy(); self.get_FR()
             self.R[0] = self.sdagger; self.vR[0] = 0.; self.FR[0] = 0.
             self.get_vy(); self.get_vR()
-       else:
+        else:
             self.get_vy(); self.get_vR()
             self.get_y(); self.get_R()
             self.get_Fy(); self.get_FR()
