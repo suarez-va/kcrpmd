@@ -123,6 +123,7 @@ class Kcrpmd():
             currtime = step * self.delt
             if(self.resample_vel and np.mod(step, self.Ntemp) == 0):
                 self.resample_vR()
+                self.resample_vy()
             if(np.mod(step, self.Nprint) == 0):
                 print(f"PRINTING!!! --> t = {currtime}")
                 self.print_data(currtime)
