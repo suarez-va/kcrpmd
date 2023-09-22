@@ -25,13 +25,13 @@ class Kcrpmd():
 ###############################################################
 
     def get_y(self):
-        if (self.langevin_nve):
+        if (self.langevin_nve and (self.y <= -0.5 or self.y >= 0.5)):
             self.y += self.vy * self.delt + self.sigma / (2 * np.sqrt(3)) * self.theta * np.sqrt(self.delt**3)
         else:
             self.y += self.vy * self.delt
 
     def get_vy(self):
-        if (self.langevin_nve):
+        if (self.langevin_nve and (self.y <= -0.5 or self.y >= 0.5)):
             self.vy += 0.5 * self.delt * self.Fy / self.sys.my - 0.5 * self.gammay * self.vy * self.delt + 0.5 * self.sigma * self.xi * np.sqrt(self.delt) - 0.125 * self.gammay * self.delt**2 * (self.Fy / self.sys.my - self.gammay * self.vy) - 0.25 * self.gammay * self.sigma * np.sqrt(self.delt**3) * (0.5 * self.xi + 1/np.sqrt(3) * self.theta)
         else:
             self.vy += 0.5 * self.delt * self.Fy / self.sys.my
