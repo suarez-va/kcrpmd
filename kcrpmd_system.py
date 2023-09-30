@@ -5,17 +5,19 @@ from abc import ABC, abstractmethod
 class KcrpmdSystem(ABC):
 
     @abstractmethod
-    def __init__(self, beta, a0, b, c, eta, my, sysparam):
+    def __init__(self, beta, a0, b, c, d, e, eta, my, sysparam):
         self.beta = beta
         self.a0 = a0
         self.b = b
         self.c = c
+        self.d = d
+        self.e = e
         self.eta = eta
         self.my = my
         self.sysparam = sysparam
 
     # All Classical Nuclear Potential Surfaces
-    
+
     @abstractmethod
     def V0(self, R):
         pass
@@ -39,9 +41,9 @@ class KcrpmdSystem(ABC):
     
     def VKP(self, R):
         return self.VMF(R) - 1 / self.beta * np.log(1 - np.exp(self.beta * (self.VMF(R) - self.V0(R))) - np.exp(self.beta * (self.VMF(R) - self.V1(R))))
-    
+
     # All Classical Nuclear Forces
-    
+
     @abstractmethod
     def F0(self, R):
         pass
@@ -100,15 +102,15 @@ class KcrpmdSystem(ABC):
             return -1 / self.beta * np.log(1 / (1 + np.exp(self.b * (2 * abs(y - theta) - 1))))
         else:
             return -1 / self.beta * np.log(1 / (1 + np.exp(-self.b * (2 * abs(y - theta) - 1)))) + self.b * (2 * abs(y - theta) - 1) / self.beta
-        
+
     def w(self, R):
         return (self.V0(R) - self.V1(R)) / self.K(R)
-        
+
     def a(self, R):
-        return self.a0 / 2 * (1 + np.tanh(-self.c * (self.beta * abs(self.K(R)) - 1)))
-    
+        return self.a0 / 2 * (1 + np.tanh(-self.c * (self.beta * abs(self.K(R)) - self.e)))
+
     def C(self, R):
-        return self.eta * np.sqrt(self.a(R) / np.pi) + (1 - self.eta * np.sqrt(self.a(R) / np.pi)) * 0.5 * (1 + np.tanh(self.c * (self.beta * abs(self.K(R)) - 1)))
+        return 1 + 0.5 * (np.sqrt(self.a(R) / np.pi) * self.eta - 1) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - self.e)))
 
     def VKC(self, y, R):
         VKP_arg = -self.beta * self.Vr(y, 0) + np.log(self.C(R)) - self.a(R) * self.w(R)**2 - self.beta * self.VKP(R)
@@ -127,15 +129,19 @@ class KcrpmdSystem(ABC):
         return -1 / self.K(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R))
 
     def da(self, R):
-        hyperbolic_arg = self.c * (self.beta * abs(self.K(R)) - 1)
+        hyperbolic_arg = self.c * (self.beta * abs(self.K(R)) - self.e)
         if abs(hyperbolic_arg) > 250.:
             return 0.
         else:
             return 0.5 * self.a0 * self.c * self.beta * np.sign(self.K(R)) / (np.cosh(hyperbolic_arg)**2) * self.FK(R)
-        
+    
     def dC(self, R):
-        return 1 / self.a0 * (1.5 * self.eta * np.sqrt(self.a(R) / np.pi) - 1) * self.da(R)
-
+        hyperbolic_arg = -self.d * (self.beta * abs(self.K(R)) - self.e)
+        if abs(hyperbolic_arg) > 250.:
+            return self.eta / (4 * np.sqrt(np.pi)) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - self.e))) * self.da(R) / np.sqrt(self.a(R))
+        else:
+            return self.eta / (4 * np.sqrt(np.pi)) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - self.e))) * self.da(R) / np.sqrt(self.a(R)) + 0.5 * self.d * self.beta * np.sign(self.K(R)) * (np.sqrt(self.a(R) / np.pi) * self.eta - 1) / (np.cosh(hyperbolic_arg)**2) * self.FK(R) 
+    
     def FKC_y(self, y, R):
         VKP_arg = -self.beta * self.Vr(y, 0) + np.log(self.C(R)) - self.a(R) * self.w(R)**2 - self.beta * self.VKP(R)
         V0_arg = -self.beta * self.Vr(y, -1) - self.beta * self.V0(R)
@@ -148,15 +154,13 @@ class KcrpmdSystem(ABC):
         V0_arg = -self.beta * self.Vr(y, -1) - self.beta * self.V0(R)
         V1_arg = -self.beta * self.Vr(y, 1) - self.beta * self.V1(R)
         exp_shift = np.maximum(np.maximum(V0_arg, V1_arg), VKP_arg)
-        #(1 / (self.beta * self.C(R)) * self.dC(R) - self.w(R)**2 / self.beta * self.da(R) - 2 * self.a(R) * self.w(R) / self.beta * self.dw(R) + self.FKP(R))
         return ((1 / (self.beta * self.C(R)) * self.dC(R) - self.w(R)**2 / self.beta * self.da(R) - 2 * self.a(R) * self.w(R) / self.beta * self.dw(R) + self.FKP(R)) * np.exp(VKP_arg - exp_shift) + self.F0(R) * np.exp(V0_arg - exp_shift) + self.F1(R) * np.exp(V1_arg - exp_shift)) / (np.exp(VKP_arg - exp_shift) + np.exp(V0_arg - exp_shift) + np.exp(V1_arg - exp_shift))
-
 
 ##############################################################
 
 class SystemB(KcrpmdSystem):
-    def __init__(self, beta, a0, b, c, eta, my, sysparam):
-        super().__init__(beta, a0, b, c, eta, my, sysparam)
+    def __init__(self, beta, a0, b, c, d, e, eta, my, sysparam):
+        super().__init__(beta, a0, b, c, d, e, eta, my, sysparam)
         self.ms = sysparam[0]
         self.omegas = sysparam[1]
         self.s0 = sysparam[2]
@@ -222,7 +226,6 @@ class SystemB(KcrpmdSystem):
             F[1:1 + self.nbath] = -self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2))
             F[1 + self.nbath] = -self.mq * self.omegaq**2 * R[1 + self.nbath]
         return F
-    
 
     def F1(self, R):
         F = np.zeros(self.dnuclei)
@@ -252,5 +255,3 @@ class SystemB(KcrpmdSystem):
             R[0] = sdagger
             R[1:1 + self.nbath] = self.cj * sdagger / (self.M * self.omegaj**2)
         return R
-
-
