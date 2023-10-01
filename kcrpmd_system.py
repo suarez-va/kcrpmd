@@ -182,8 +182,9 @@ class SystemB(KcrpmdSystem):
 
         self.mq= sysparam[6]
         self.omegaq = sysparam[7]
-        self.K0= sysparam[8]
-        self.bq= sysparam[9]
+        self.Dq = sysparam[8]
+        self.K0= sysparam[9]
+        self.bq= sysparam[10]
     
         self.set_dnuclei()
         self.set_mR()
@@ -197,7 +198,7 @@ class SystemB(KcrpmdSystem):
             self.omegac = self.omegas
             self.gamma = 1.0 * self.M * self.omegac
             self.omegaj = -self.omegac * np.log((np.arange(self.nbath) + 0.5) / self.nbath)
-            self.cj = self.omegaj * np.sqrt(2 * self.gamma * self.M* self.omegac / (self.nbath * np.pi))
+            self.cj = self.omegaj * np.sqrt(2 * self.gamma * self.M * self.omegac / (self.nbath * np.pi))
 
     def set_mR(self):
         mR = np.ones(self.dnuclei)
@@ -210,11 +211,23 @@ class SystemB(KcrpmdSystem):
             mR[self.nbath + 1] = self.mq
         self.mR = mR
 
+    def Vq(self, q):
+        if (q > 0.):
+            return 0.5 * self.mq * self.omegaq**2 * q**2
+        else:
+            return self.Dq * (1 - np.exp(-np.sqrt(0.5 * self.mq * self.omegaq**2 / self.Dq) * q))**2
+
+    def Fq(self, q):
+        if (q > 0.):
+            return -self.mq * self.omegaq**2 * q
+        else:
+            return -2 * self.Dq * np.sqrt(0.5 * self.mq * self.omegaq**2 / self.Dq) * np.exp(-np.sqrt(0.5 * self.mq * self.omegaq**2 / self.Dq) * q) * (1 - np.exp(-np.sqrt(0.5 * self.mq * self.omegaq**2 / self.Dq) * q))
+
     def V0(self, R):
         if self.nbath == 0:
-            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s0)**2 + 0.5 * self.mq * self.omegaq**2 * (R[1])**2
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s0)**2 + self.Vq(R[1])
         else:
-            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s0)**2 + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + 0.5 * self.mq * self.omegaq**2 * (R[1 + self.nbath])**2
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s0)**2 + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + self.Vq(R[1 + self.nbath])
 
     def V1(self, R):
         if self.nbath == 0:    
@@ -232,22 +245,22 @@ class SystemB(KcrpmdSystem):
         F = np.zeros(self.dnuclei)
         if self.nbath == 0:
             F[0] = -self.ms * self.omegas**2 * (R[0] - self.s0)
-            F[1] = -self.mq * self.omegaq**2 * R[1]
+            F[1] = self.Fq(R[1])
         else:
             F[0] = -self.ms * self.omegas**2 * (R[0] - self.s0) + np.sum(self.cj * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2)))
             F[1:1 + self.nbath] = -self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2))
-            F[1 + self.nbath] = -self.mq * self.omegaq**2 * R[1 + self.nbath]
+            F[1 + self.nbath] = self.Fq(R[1 + self.nbath])
         return F
 
     def F1(self, R):
         F = np.zeros(self.dnuclei)
         if self.nbath == 0:
             F[0] = -self.ms * self.omegas**2 * (R[0] - self.s1)
-            F[1] = -self.mq * self.omegaq**2 * R[1]
+            F[1] = self.Fq(R[1])
         else:
             F[0] = -self.ms * self.omegas**2 * (R[0] - self.s1) + np.sum(self.cj * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2)))
             F[1:1 + self.nbath] = -self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2))
-            F[1 + self.nbath] = -self.mq * self.omegaq**2 * R[1 + self.nbath]
+            F[1 + self.nbath] = self.Fq(R[1 + self.nbath])
         return F
     
     def FK(self, R):
