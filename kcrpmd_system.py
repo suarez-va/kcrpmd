@@ -37,10 +37,18 @@ class KcrpmdSystem(ABC):
         return 0.5 * (self.V0(R) + self.V1(R)) + 0.5 * np.sqrt((self.V0(R) - self.V1(R))**2 + 4 * self.K(R)**2)
 
     def VMF(self, R):
-        return self.Vg(R) - 1 / self.beta * np.log(1 + np.exp(self.beta * (self.Vg(R) - self.Ve(R))))
+        return self.Vg(R) - 1 / self.beta * np.log(1 + np.exp(-self.beta * (self.Ve(R) - self.Vg(R))))
     
     def VKP(self, R):
-        return self.VMF(R) - 1 / self.beta * np.log(1 - np.exp(self.beta * (self.VMF(R) - self.V0(R))) - np.exp(self.beta * (self.VMF(R) - self.V1(R))))
+        V0 = self.V0(R)
+        V1 = self.V1(R)
+        K = self.K(R)
+        if (V0 == V1):
+            return V0 - 1 / self.beta * np.log(4 * np.sinh(0.5 * self.beta * K)**2)
+        elif (self.beta * K > 1e-3):
+            return self.VMF(R) - 1 / self.beta * np.log(1 - np.exp(-self.beta * (V0 - self.VMF(R))) - np.exp(-self.beta * (V1 - self.VMF(R))))
+        else:
+            return 0.5 * (self.V0(R) + self.V1(R)) - 1 / self.beta * np.log((self.beta * K)**2 * np.sinh(0.5 * self.beta * (V0 - V1)) / (0.5 * self.beta * (V0 - V1)))
 
     # All Classical Nuclear Forces
 
@@ -63,7 +71,7 @@ class KcrpmdSystem(ABC):
         return 0.5 * (self.F0(R) + self.F1(R)) + ((self.V0(R) - self.V1(R)) * (self.F0(R) - self.F1(R)) + 4 * self.K(R) * self.FK(R)) / (2 * np.sqrt((self.V0(R) - self.V1(R))**2 + 4 * self.K(R)**2))
 
     def FMF(self, R):
-        return self.Fg(R) - 0.5 * (self.Fg(R) - self.Fe(R)) * (1 + np.tanh(0.5 * self.beta * (self.Vg(R) - self.Ve(R))))
+        return self.Fg(R) + 0.5 * (self.Fe(R) - self.Fg(R)) * (1 + np.tanh(-0.5 * self.beta * (self.Ve(R) - self.Vg(R))))
     
     def FKP(self, R):
         return (self.FMF(R) - self.F0(R) * np.exp(self.beta * (self.VMF(R) - self.V0(R))) - self.F1(R) * np.exp(self.beta * (self.VMF(R) - self.V1(R)))) / (1 - np.exp(self.beta * (self.VMF(R) - self.V0(R))) - np.exp(self.beta * (self.VMF(R) - self.V1(R))))
