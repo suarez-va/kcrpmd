@@ -195,7 +195,7 @@ class SystemB(KcrpmdSystem):
         exp_arg = -self.beta * (Vq(q_array))
         exp_shift = np.max(exp_arg) - 500.
         N = 1 / np.trapz(np.exp(exp_arg - exp_shift), q_array)
-        Pq_array = N * np.exp(-self.beta * (self.Vq(q_array)) - exp_shift)
+        Pq_array = N * np.exp(-self.beta * (Vq(q_array)) - exp_shift)
         Kq_array = Kq(q_array)
         self.eta = 2 * np.pi * np.trapz(Kq_array * Pq_array, q_array) * np.trapz(np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array) / np.trapz(Kq_array * np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array)
         self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(Kq_array**3 * Pq_array, q_array) / np.trapz(Kq_array**2 * Pq_array, q_array))**2
