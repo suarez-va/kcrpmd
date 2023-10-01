@@ -40,9 +40,7 @@ class KcrpmdSystem(ABC):
         return self.Vg(R) - 1 / self.beta * np.log(1 + np.exp(-self.beta * (self.Ve(R) - self.Vg(R))))
     
     def VKP(self, R):
-        V0 = self.V0(R)
-        V1 = self.V1(R)
-        K = self.K(R)
+        V0 = self.V0(R); V1 = self.V1(R); K = self.K(R)
         if (V0 == V1):
             return V0 - 1 / self.beta * np.log(4 * np.sinh(0.5 * self.beta * K)**2)
         elif (self.beta * K > 1e-3):
@@ -74,7 +72,13 @@ class KcrpmdSystem(ABC):
         return self.Fg(R) + 0.5 * (self.Fe(R) - self.Fg(R)) * (1 + np.tanh(-0.5 * self.beta * (self.Ve(R) - self.Vg(R))))
     
     def FKP(self, R):
-        return (self.FMF(R) - self.F0(R) * np.exp(self.beta * (self.VMF(R) - self.V0(R))) - self.F1(R) * np.exp(self.beta * (self.VMF(R) - self.V1(R)))) / (1 - np.exp(self.beta * (self.VMF(R) - self.V0(R))) - np.exp(self.beta * (self.VMF(R) - self.V1(R))))
+        V0 = self.V0(R); V1 = self.V1(R); K = self.K(R)
+        if (V0 == V1):
+            return self.F0(R) - self.FK(R) * np.cosh(0.5 * self.beta * K) / np.sinh(0.5 * self.beta * K)
+        elif (self.beta * K > 1e-3):
+            return (self.FMF(R) - self.F0(R) * np.exp(-self.beta * (V0 - self.VMF(R))) - self.F1(R) * np.exp(-self.beta * (V1 - self.VMF(R)))) / (1 - np.exp(-self.beta * (V0 - self.VMF(R))) - np.exp(-self.beta * (V1 - self.VMF(R))))
+        else:
+            return (self.F0(R) + self.F1(R)) * (1 / (self.beta * (V0 - V1)) - 1 / (np.exp(self.beta * (V0 - V1)) - 1)) - 2 * self.FK(R) / (self.beta * K)
 
     # Additional Initialization Functions
 
