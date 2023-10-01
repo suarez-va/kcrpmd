@@ -189,6 +189,18 @@ class SystemB(KcrpmdSystem):
         self.set_dnuclei()
         self.set_mR()
 
+    def set_eta_my(self, q_array):
+        Vq = lambda q: np.piecewise(q, [q >= 0., q < 0.], [lambda q: 0.5 * self.mq * self.omegaq**2 * q**2, lambda q: self.Dq * (1 - np.exp(-np.sqrt(0.5 * self.mq * self.omegaq**2 / self.Dq) * q))**2])
+        Kq = lambda q: self.K0 * np.exp(-self.bq * q)
+        exp_arg = -self.beta * (Vq(q_array))
+        exp_shift = np.max(exp_arg) - 500.
+        N = 1 / np.trapz(np.exp(exp_arg - exp_shift), q_array)
+        Pq_array = N * np.exp(-self.beta * (self.Vq(q_array)) - exp_shift)
+        Kq_array = Kq(q_array)
+        self.eta = 2 * np.pi * np.trapz(Kq_array * Pq_array, q_array) * np.trapz(np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array) / np.trapz(Kq_array * np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array)
+        self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(Kq_array**3 * Pq_array, q_array) / np.trapz(Kq_array**2 * Pq_array, q_array))**2
+        return None
+
     def set_dnuclei(self):
         if self.nbath == 0:
             self.dnuclei = 2
