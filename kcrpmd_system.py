@@ -78,7 +78,7 @@ class KcrpmdSystem(ABC):
         elif (self.beta * K > 1e-3):
             return (self.FMF(R) - self.F0(R) * np.exp(-self.beta * (V0 - self.VMF(R))) - self.F1(R) * np.exp(-self.beta * (V1 - self.VMF(R)))) / (1 - np.exp(-self.beta * (V0 - self.VMF(R))) - np.exp(-self.beta * (V1 - self.VMF(R))))
         else:
-            return 0.5 * (self.F0(R) + self.F1(R)) (self.F0(R) - self.F1(R)) * (1 / (self.beta * (V0 - V1)) - 0.5 * np.cosh(0.5 * self.beta * (V0 - V1)) / np.sinh(0.5 * self.beta * (V0 - V1)))  - 2 * self.FK(R) / (self.beta * K)
+            return 0.5 * (self.F0(R) + self.F1(R)) + (self.F0(R) - self.F1(R)) * (1 / (self.beta * (V0 - V1)) - 0.5 * np.cosh(0.5 * self.beta * (V0 - V1)) / np.sinh(0.5 * self.beta * (V0 - V1)))  - 2 * self.FK(R) / (self.beta * K)
 
     # Additional Initialization Functions
 
