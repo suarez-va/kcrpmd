@@ -292,3 +292,124 @@ class SystemB(KcrpmdSystem):
             R[0] = sdagger
             R[1:1 + self.nbath] = self.cj * sdagger / (self.M * self.omegaj**2)
         return R
+
+##############################################################
+
+class SystemC(KcrpmdSystem):
+    def __init__(self, beta, a0, b, c, d, e, eta, my, sysparam):
+        super().__init__(beta, a0, b, c, d, e, eta, my, sysparam)
+        self.ms = sysparam[0]
+        self.omegas = sysparam[1]
+        self.s0 = sysparam[2]
+        self.s1 = sysparam[3]
+        self.epsilon = sysparam[4]
+        self.nbath = int(sysparam[5])
+
+        self.mq= sysparam[6]
+        self.Aq = sysparam[7]
+        self.Bq = sysparam[8]
+        self.Cq = sysparam[9]
+        self.K0= sysparam[10]
+        self.bq= sysparam[11]
+ 
+        self.set_dnuclei()
+        self.set_mR()
+
+    def set_eta_my(self, q_array):
+        Vq = lambda q: self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2        
+        Kq = lambda q: self.K0 * np.exp(-self.bq * q)
+        exp_arg = -self.beta * (Vq(q_array))
+        exp_shift = np.max(exp_arg) - 500.
+        N = 1 / np.trapz(np.exp(exp_arg - exp_shift), q_array)
+        Pq_array = N * np.exp(-self.beta * (Vq(q_array)) - exp_shift)
+        Kq_array = Kq(q_array)
+        self.eta = 2 * np.pi * np.trapz(Kq_array * Pq_array, q_array) * np.trapz(np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array) / np.trapz(Kq_array * np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array)
+        self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(Kq_array**3 * Pq_array, q_array) / np.trapz(Kq_array**2 * Pq_array, q_array))**2
+        return None
+
+    def set_dnuclei(self):
+        if self.nbath == 0:
+            self.dnuclei = 2
+        else:
+            self.dnuclei = 2 + self.nbath
+            self.M = self.ms
+            self.omegac = self.omegas
+            self.gamma = 1.0 * self.M * self.omegac
+            self.omegaj = -self.omegac * np.log((np.arange(self.nbath) + 0.5) / self.nbath)
+            self.cj = self.omegaj * np.sqrt(2 * self.gamma * self.M * self.omegac / (self.nbath * np.pi))
+
+    def set_mR(self):
+        mR = np.ones(self.dnuclei)
+        if self.nbath == 0:
+            mR[0] = self.ms
+            mR[1] = self.mq
+        else:
+            mR *= self.M
+            mR[0] = self.ms
+            mR[self.nbath + 1] = self.mq
+        self.mR = mR
+
+    def Vq(self, q):
+        return self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2
+
+    def Fq(self, q):
+        return 4 * self.Aq * q**3 - 3 * self.Bq * q**2 + 2 * self.Cq * q
+
+    def V0(self, R):
+        if self.nbath == 0:
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s0)**2 + self.Vq(R[1])
+        else:
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s0)**2 + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + self.Vq(R[1 + self.nbath])
+
+    def V1(self, R):
+        if self.nbath == 0:    
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + 0.5 * self.mq * self.omegaq**2 * (R[1])**2
+        else:
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + 0.5 * self.mq * self.omegaq**2 * (R[1 + self.nbath])**2
+
+    def K(self, R):
+        if self.nbath == 0:
+            return self.K0 * np.exp(-self.bq * R[1])
+        else:
+            return self.K0 * np.exp(-self.bq * R[1 + self.nbath])
+
+    def F0(self, R):
+        F = np.zeros(self.dnuclei)
+        if self.nbath == 0:
+            F[0] = -self.ms * self.omegas**2 * (R[0] - self.s0)
+            F[1] = self.Fq(R[1])
+        else:
+            F[0] = -self.ms * self.omegas**2 * (R[0] - self.s0) + np.sum(self.cj * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2)))
+            F[1:1 + self.nbath] = -self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2))
+            F[1 + self.nbath] = self.Fq(R[1 + self.nbath])
+        return F
+
+    def F1(self, R):
+        F = np.zeros(self.dnuclei)
+        if self.nbath == 0:
+            F[0] = -self.ms * self.omegas**2 * (R[0] - self.s1)
+            F[1] = self.Fq(R[1])
+        else:
+            F[0] = -self.ms * self.omegas**2 * (R[0] - self.s1) + np.sum(self.cj * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2)))
+            F[1:1 + self.nbath] = -self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M * self.omegaj**2))
+            F[1 + self.nbath] = self.Fq(R[1 + self.nbath])
+        return F
+    
+    def FK(self, R):
+        F = np.zeros(self.dnuclei)
+        if self.nbath == 0:    
+            F[1] = self.bq * self.K0 * np.exp(-self.bq * R[1])
+        else:
+            F[1 + self.nbath] = self.bq * self.K0 * np.exp(-self.bq * R[1 + self.nbath])
+        return F
+
+    def kinked_pair_R(self):
+        sdagger = 0.5 * (self.s0 + self.s1) - self.epsilon / (self.ms * self.omegas**2 * (self.s0 - self.s1))
+        R = np.zeros(self.dnuclei)
+        if self.nbath == 0:
+            R[0] = sdagger
+        else:
+            R[0] = sdagger
+            R[1:1 + self.nbath] = self.cj * sdagger / (self.M * self.omegaj**2)
+        return R
+
