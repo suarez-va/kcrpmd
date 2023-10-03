@@ -245,7 +245,7 @@ class SystemB(KcrpmdSystem):
         if self.nbath == 0:    
             return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + 0.5 * self.mq * self.omegaq**2 * (R[1])**2
         else:
-            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + 0.5 * self.mq * self.omegaq**2 * (R[1 + self.nbath])**2
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + self.Vq(R[1 + self.nbath])
 
     def K(self, R):
         if self.nbath == 0:
@@ -365,7 +365,7 @@ class SystemC(KcrpmdSystem):
         if self.nbath == 0:    
             return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + 0.5 * self.mq * self.omegaq**2 * (R[1])**2
         else:
-            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + 0.5 * self.mq * self.omegaq**2 * (R[1 + self.nbath])**2
+            return 0.5 * self.ms * self.omegas**2 * (R[0] - self.s1)**2 + self.epsilon + np.sum(0.5 * self.M * self.omegaj**2 * (R[1:1 + self.nbath] - self.cj * R[0] / (self.M* self.omegaj**2))**2) + self.Vq(R[1 + self.nbath])
 
     def K(self, R):
         if self.nbath == 0:
