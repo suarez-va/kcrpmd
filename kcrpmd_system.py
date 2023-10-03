@@ -353,7 +353,7 @@ class SystemC(KcrpmdSystem):
         return self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2
 
     def Fq(self, q):
-        return 4 * self.Aq * q**3 - 3 * self.Bq * q**2 + 2 * self.Cq * q
+        return -4 * self.Aq * q**3 + 3 * self.Bq * q**2 - 2 * self.Cq * q
 
     def V0(self, R):
         if self.nbath == 0:
