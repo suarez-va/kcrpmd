@@ -181,7 +181,7 @@ class SystemB(AdiabaticSystem):
 
 ##############################################################
 
-class SystemC(KcrpmdSystem):
+class SystemC(AdiabaticSystem):
     def __init__(self, beta, sysparam):
         super().__init__(beta, sysparam)
         self.ms = sysparam[0]
