@@ -3,13 +3,13 @@ import numpy as np
 # Classical Lmimit Build
 class Kcrpmd():
 
-    def __init__(self, sys, delt, Nstep, Nprint, langevin_nve=False, gammay=0., resample_vel=False, Ntemp=100, fix_y=False, set_y=-1., fix_s=False):
+    def __init__(self, sys, delt, Nstep, Nprint, langevin_nve=False, resample_vel=False, Ntemp=100, fix_y=False, set_y=-1., fix_s=False):
         self.sys = sys
         self.delt = delt
         self.Nstep = Nstep
         self.Nprint = Nprint
         self.langevin_nve = langevin_nve
-        self.gammay = gammay; self.sigma = np.sqrt(2 * self.gammay / (self.sys.beta * self.sys.my)); self.theta = 0.; self.xi = 0.
+        self.gammay = self.sys.gammay; self.sigma = np.sqrt(2 * self.gammay / (self.sys.beta * self.sys.my)); self.theta = 0.; self.xi = 0.
         self.resample_vel = resample_vel
         self.Ntemp = Ntemp
         self.fix_y = fix_y
