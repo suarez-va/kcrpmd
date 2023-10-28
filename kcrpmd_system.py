@@ -5,16 +5,17 @@ from abc import ABC, abstractmethod
 class KcrpmdSystem(ABC):
 
     @abstractmethod
-    def __init__(self, beta, a0, b, c, d, e, eta, my, sysparam):
+    def __init__(self, beta, a0, b, c, d, sysparam):
         self.beta = beta
         self.a0 = a0
         self.b = b
         self.c = c
         self.d = d
-        self.e = e
-        self.eta = eta
-        self.my = my
         self.sysparam = sysparam
+
+    @abstractmethod
+    def set_eta_my_gammay(self, *args):
+        pass
 
     # All Classical Nuclear Potential Surfaces
 
@@ -119,10 +120,10 @@ class KcrpmdSystem(ABC):
         return (self.V0(R) - self.V1(R)) / self.K(R)
 
     def a(self, R):
-        return self.a0 / 2 * (1 + np.tanh(-self.c * (self.beta * abs(self.K(R)) - self.e)))
+        return self.a0 / 2 * (1 + np.tanh(-self.c * (self.beta * abs(self.K(R)) - 1)))
 
     def C(self, R):
-        return 1 + 0.5 * (np.sqrt(self.a(R) / np.pi) * self.eta - 1) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - self.e)))
+        return 1 + 0.5 * (np.sqrt(self.a(R) / np.pi) * self.eta - 1) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - 1)))
 
     def VKC(self, y, R):
         VKP_arg = -self.beta * self.Vr(y, 0) + np.log(self.C(R)) - self.a(R) * self.w(R)**2 - self.beta * self.VKP(R)
@@ -141,19 +142,19 @@ class KcrpmdSystem(ABC):
         return -1 / self.K(R) * (self.F0(R) - self.F1(R) - self.w(R) * self.FK(R))
 
     def da(self, R):
-        hyperbolic_arg = self.c * (self.beta * abs(self.K(R)) - self.e)
+        hyperbolic_arg = self.c * (self.beta * abs(self.K(R)) - 1)
         if abs(hyperbolic_arg) > 250.:
             return 0.
         else:
             return 0.5 * self.a0 * self.c * self.beta * np.sign(self.K(R)) / (np.cosh(hyperbolic_arg)**2) * self.FK(R)
     
     def dC(self, R):
-        hyperbolic_arg = -self.d * (self.beta * abs(self.K(R)) - self.e)
+        hyperbolic_arg = -self.d * (self.beta * abs(self.K(R)) - 1)
         if abs(hyperbolic_arg) > 250.:
-            return self.eta / (4 * np.sqrt(np.pi)) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - self.e))) * self.da(R) / np.sqrt(self.a(R))
+            return self.eta / (4 * np.sqrt(np.pi)) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - 1))) * self.da(R) / np.sqrt(self.a(R))
         else:
-            return self.eta / (4 * np.sqrt(np.pi)) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - self.e))) * self.da(R) / np.sqrt(self.a(R)) + 0.5 * self.d * self.beta * np.sign(self.K(R)) * (np.sqrt(self.a(R) / np.pi) * self.eta - 1) / (np.cosh(hyperbolic_arg)**2) * self.FK(R) 
-    
+            return self.eta / (4 * np.sqrt(np.pi)) * (1 + np.tanh(-self.d * (self.beta * abs(self.K(R)) - 1))) * self.da(R) / np.sqrt(self.a(R)) + 0.5 * self.d * self.beta * np.sign(self.K(R)) * (np.sqrt(self.a(R) / np.pi) * self.eta - 1) / (np.cosh(hyperbolic_arg)**2) * self.FK(R) 
+
     def FKC_y(self, y, R):
         VKP_arg = -self.beta * self.Vr(y, 0) + np.log(self.C(R)) - self.a(R) * self.w(R)**2 - self.beta * self.VKP(R)
         V0_arg = -self.beta * self.Vr(y, -1) - self.beta * self.V0(R)
@@ -170,9 +171,9 @@ class KcrpmdSystem(ABC):
 
 ##############################################################
 
-class SystemB(KcrpmdSystem):
-    def __init__(self, beta, a0, b, c, d, e, eta, my, sysparam):
-        super().__init__(beta, a0, b, c, d, e, eta, my, sysparam)
+class SystemAB(KcrpmdSystem):
+    def __init__(self, beta, a0, b, c, d, sysparam):
+        super().__init__(beta, a0, b, c, d, sysparam)
         self.ms = sysparam[0]
         self.omegas = sysparam[1]
         self.s0 = sysparam[2]
@@ -189,16 +190,16 @@ class SystemB(KcrpmdSystem):
         self.set_dnuclei()
         self.set_mR()
 
-    def set_eta_my(self, q_array):
+    def set_eta_my_gammay(self, q_array):
         Vq = lambda q: np.piecewise(q, [q >= 0., q < 0.], [lambda q: 0.5 * self.mq * self.omegaq**2 * q**2, lambda q: self.Dq * (1 - np.exp(-np.sqrt(0.5 * self.mq * self.omegaq**2 / self.Dq) * q))**2])
         Kq = lambda q: self.K0 * np.exp(-self.bq * q)
         exp_arg = -self.beta * (Vq(q_array))
         exp_shift = np.max(exp_arg) - 500.
-        N = 1 / np.trapz(np.exp(exp_arg - exp_shift), q_array)
-        Pq_array = N * np.exp(-self.beta * (Vq(q_array)) - exp_shift)
+        Pq_array = np.exp(exp_arg - exp_shift) / np.trapz(np.exp(exp_arg - exp_shift), q_array)
         Kq_array = Kq(q_array)
-        self.eta = 2 * np.pi * np.trapz(Kq_array * Pq_array, q_array) * np.trapz(np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array) / np.trapz(Kq_array * np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array)
-        self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(Kq_array**3 * Pq_array, q_array) / np.trapz(Kq_array**2 * Pq_array, q_array))**2
+        self.eta = 2 * np.pi * np.trapz(abs(Kq_array) * Pq_array, q_array) * np.trapz(abs(Kq_array)**2 * Pq_array, q_array) / np.trapz(abs(Kq_array)**3 * Pq_array, q_array)  
+        self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(abs(Kq_array)**3 * Pq_array, q_array) / np.trapz(abs(Kq_array)**2 * Pq_array, q_array))**2
+        self.gammay = 0.5 * np.sqrt((1 + np.abs(-2 * np.log(np.sqrt(self.a0 / np.pi) * self.eta * self.beta**2) - 4 * np.trapz(np.log(abs(Kq_array)) * Pq_array, q_array))) / (self.beta * self.my)) 
         return None
 
     def set_dnuclei(self):
@@ -296,8 +297,8 @@ class SystemB(KcrpmdSystem):
 ##############################################################
 
 class SystemC(KcrpmdSystem):
-    def __init__(self, beta, a0, b, c, d, e, eta, my, sysparam):
-        super().__init__(beta, a0, b, c, d, e, eta, my, sysparam)
+    def __init__(self, beta, a0, b, c, d, sysparam):
+        super().__init__(beta, a0, b, c, d, sysparam)
         self.ms = sysparam[0]
         self.omegas = sysparam[1]
         self.s0 = sysparam[2]
@@ -315,16 +316,16 @@ class SystemC(KcrpmdSystem):
         self.set_dnuclei()
         self.set_mR()
 
-    def set_eta_my(self, q_array):
+    def set_eta_my_gammay(self, q_array):
         Vq = lambda q: self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2        
         Kq = lambda q: self.K0 * np.exp(-self.bq * q)
         exp_arg = -self.beta * (Vq(q_array))
         exp_shift = np.max(exp_arg) - 500.
-        N = 1 / np.trapz(np.exp(exp_arg - exp_shift), q_array)
-        Pq_array = N * np.exp(-self.beta * (Vq(q_array)) - exp_shift)
+        Pq_array = np.exp(exp_arg - exp_shift) / np.trapz(np.exp(exp_arg - exp_shift), q_array)
         Kq_array = Kq(q_array)
-        self.eta = 2 * np.pi * np.trapz(Kq_array * Pq_array, q_array) * np.trapz(np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array) / np.trapz(Kq_array * np.sinh(0.5 * self.beta * Kq_array)**2 * Pq_array, q_array)
-        self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(Kq_array**3 * Pq_array, q_array) / np.trapz(Kq_array**2 * Pq_array, q_array))**2
+        self.eta = 2 * np.pi * np.trapz(abs(Kq_array) * Pq_array, q_array) * np.trapz(abs(Kq_array)**2 * Pq_array, q_array) / np.trapz(abs(Kq_array)**3 * Pq_array, q_array)  
+        self.my = self.beta**3 * self.eta**2 / ((2*np.pi)**3) * (np.trapz(abs(Kq_array)**3 * Pq_array, q_array) / np.trapz(abs(Kq_array)**2 * Pq_array, q_array))**2
+        self.gammay = 0.5 * np.sqrt((1 + np.abs(-2 * np.log(np.sqrt(self.a0 / np.pi) * self.eta * self.beta**2) - 4 * np.trapz(np.log(abs(Kq_array)) * Pq_array, q_array))) / (self.beta * self.my)) 
         return None
 
     def set_dnuclei(self):
