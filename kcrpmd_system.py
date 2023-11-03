@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.optimize import minimize
 from abc import ABC, abstractmethod
 
 # Classical Only
@@ -307,14 +308,27 @@ class SystemC(KcrpmdSystem):
         self.nbath = int(sysparam[5])
 
         self.mq= sysparam[6]
-        self.Aq = sysparam[7]
-        self.Bq = sysparam[8]
-        self.Cq = sysparam[9]
+        self.q0 = sysparam[7]
+        self.lepsilon = sysparam[8]
+        self.Ea = sysparam[9]
         self.K0= sysparam[10]
         self.bq= sysparam[11]
  
+        self.set_ABC
         self.set_dnuclei()
         self.set_mR()
+
+    def set_ABC(self):
+        def minimize_me(x, q0, lepsilon, Ea):
+            [A, B, C] = x
+            return (q0 - (3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2 + (lepsilon - (np.abs(A) * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**4 - np.abs(B) * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**3 + C * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2))**2 + (Ea - (np.abs(A) * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**4 - np.abs(B) * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**3 + C * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2))**2
+        x_guess = np.array([16 * self.Ea / (self.q0**4), 32 * self.Ea / (self.q0**3), 16 * self.Ea / (self.q0**2)])
+        for i in range(7):
+            x_guess = minimize(minimize_me, x_guess, args = (self.q0, self.lepsilon, self.Ea)).x
+        self.Aq = np.abs(x_guess[0])
+        self.Bq = np.abs(x_guess[1])
+        self.Cq = x_guess[2]
+        return None
 
     def set_eta_my_gammay(self, q_array):
         Vq = lambda q: self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2        
