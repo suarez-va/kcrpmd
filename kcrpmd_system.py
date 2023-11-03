@@ -314,7 +314,7 @@ class SystemC(KcrpmdSystem):
         self.K0= sysparam[10]
         self.bq= sysparam[11]
  
-        self.set_ABC
+        self.set_ABC()
         self.set_dnuclei()
         self.set_mR()
 
