@@ -324,7 +324,7 @@ class SystemC(KcrpmdSystem):
             return (q0 - (3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2 + (lepsilon - (np.abs(A) * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**4 - np.abs(B) * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**3 + C * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2))**2 + (Ea - (np.abs(A) * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**4 - np.abs(B) * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**3 + C * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2))**2
         x_guess = np.array([16 * self.Ea / (self.q0**4), 32 * self.Ea / (self.q0**3), 16 * self.Ea / (self.q0**2)])
         for i in range(7):
-            x_guess = minimize(minimize_me, x_guess, args = (self.q0, self.lepsilon, self.Ea)).x
+            x_guess = minimize(minimize_me, x_guess, args = (self.q0, self.lepsilon, self.Ea), tol=1e-11).x
         self.Aq = np.abs(x_guess[0])
         self.Bq = np.abs(x_guess[1])
         self.Cq = x_guess[2]
