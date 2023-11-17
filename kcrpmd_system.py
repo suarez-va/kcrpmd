@@ -300,21 +300,27 @@ class SystemAB(KcrpmdSystem):
 class SystemC(KcrpmdSystem):
     def __init__(self, beta, a0, b, c, d, sysparam):
         super().__init__(beta, a0, b, c, d, sysparam)
-        self.ms = sysparam[0]
-        self.omegas = sysparam[1]
-        self.s0 = sysparam[2]
-        self.s1 = sysparam[3]
-        self.epsilon = sysparam[4]
+        self.ms = float(sysparam[0])
+        self.omegas = float(sysparam[1])
+        self.s0 = float(sysparam[2])
+        self.s1 = float(sysparam[3])
+        self.epsilon = float(sysparam[4])
         self.nbath = int(sysparam[5])
 
-        self.mq= sysparam[6]
-        self.q0 = sysparam[7]
-        self.lepsilon = sysparam[8]
-        self.Ea = sysparam[9]
-        self.K0= sysparam[10]
-        self.bq= sysparam[11]
- 
+        self.mq= float(sysparam[6])
+        self.q0 = float(sysparam[7])
+        self.lepsilon = float(sysparam[8])
+        self.Ea = float(sysparam[9])
+        self.Dq = float(sysparam[10])
+        self.K0= float(sysparam[11])
+        self.bq= float(sysparam[12]) 
         self.set_ABC()
+
+        self.HW = sysparam[13]
+        self.q_star = float(sysparam[14])
+        self.k_star = float(sysparam[15])
+        self.set_HW()
+
         self.set_dnuclei()
         self.set_mR()
 
@@ -324,16 +330,38 @@ class SystemC(KcrpmdSystem):
             return (q0 - (3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2 + (lepsilon - (np.abs(A) * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**4 - np.abs(B) * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**3 + C * ((3 * np.abs(B) + np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2))**2 + (Ea - (np.abs(A) * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**4 - np.abs(B) * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**3 + C * ((3 * np.abs(B) - np.sqrt(9 * B**2 - 32 * np.abs(A) * C)) / (8 * np.abs(A)))**2))**2
         x_guess = np.array([16 * self.Ea / (self.q0**4), 32 * self.Ea / (self.q0**3), 16 * self.Ea / (self.q0**2)])
         for i in range(7):
-            x_guess = minimize(minimize_me, x_guess, args = (self.q0, self.lepsilon, self.Ea), tol=1e-11).x
+            x_guess = minimize(minimize_me, x_guess, args = (self.q0, self.lepsilon, self.Ea), method='Nelder-Mead', tol=1e-11).x
         self.Aq = np.abs(x_guess[0])
         self.Bq = np.abs(x_guess[1])
         self.Cq = x_guess[2]
         return None
 
+    def VC(self, q):
+        return np.piecewise(q, [q >= 0., q < 0.], [lambda q: self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2, lambda q: self.Dq * (1 - np.exp(-np.sqrt(self.Cq / self.Dq) * q))**2])
+
+    def FC(self, q):
+        return np.piecewise(q, [q >= 0., q < 0.], [lambda q: -4 * self.Aq * q**3 + 3 * self.Bq * q**2 - 2 * self.Cq * q, lambda q: -2 * self.Dq * np.sqrt(self.Cq / self.Dq) * np.exp(-np.sqrt(self.Cq / self.Dq) * q) * (1 - np.exp(-np.sqrt(self.Cq / self.Dq) * q))])
+
+    def set_HW(self):
+        if self.HW == 'ad':
+            self.VHW = lambda q: np.piecewise(q, [q <= self.q_star, q > self.q_star], [lambda q: 0., lambda q: self.k_star * (q - self.q_star)**6])
+            self.FHW = lambda q: np.piecewise(q, [q <= self.q_star, q > self.q_star], [lambda q: 0., lambda q: -6 * self.k_star * (q - self.q_star)**5])
+        elif self.HW == 'nad':
+            self.VHW = lambda q: np.piecewise(q, [q >= self.q_star, q < self.q_star], [lambda q: 0., lambda q: self.k_star * (q - self.q_star)**6])
+            self.FHW = lambda q: np.piecewise(q, [q <= self.q_star, q > self.q_star], [lambda q: 0., lambda q: -6 * self.k_star * (q - self.q_star)**5])
+        else:
+            self.VHW = lambda q: 0.
+            self.FHW = lambda q: 0.
+
+    def Vq(self, q):
+        return self.VC(q) + self.VHW(q)
+
+    def Fq(self, q):
+        return self.FC(q) + self.FHW(q)
+
     def set_eta_my_gammay(self, q_array):
-        Vq = lambda q: self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2        
         Kq = lambda q: self.K0 * np.exp(-self.bq * q)
-        exp_arg = -self.beta * (Vq(q_array))
+        exp_arg = -self.beta * (self.Vq(q_array))
         exp_shift = np.max(exp_arg) - 500.
         Pq_array = np.exp(exp_arg - exp_shift) / np.trapz(np.exp(exp_arg - exp_shift), q_array)
         Kq_array = Kq(q_array)
@@ -363,12 +391,6 @@ class SystemC(KcrpmdSystem):
             mR[0] = self.ms
             mR[self.nbath + 1] = self.mq
         self.mR = mR
-
-    def Vq(self, q):
-        return self.Aq * q**4 - self.Bq * q**3 + self.Cq * q**2
-
-    def Fq(self, q):
-        return -4 * self.Aq * q**3 + 3 * self.Bq * q**2 - 2 * self.Cq * q
 
     def V0(self, R):
         if self.nbath == 0:
@@ -423,8 +445,12 @@ class SystemC(KcrpmdSystem):
         R = np.zeros(self.dnuclei)
         if self.nbath == 0:
             R[0] = sdagger
+            if self.HW == 'nad':
+                R[1] = self.q0
         else:
             R[0] = sdagger
             R[1:1 + self.nbath] = self.cj * sdagger / (self.M * self.omegaj**2)
+            if self.HW == 'nad':
+                R[1 + self.nbath] = self.q0
         return R
 
