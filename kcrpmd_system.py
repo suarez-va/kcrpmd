@@ -348,7 +348,7 @@ class SystemC(KcrpmdSystem):
             self.FHW = lambda q: np.piecewise(q, [q <= self.q_star, q > self.q_star], [lambda q: 0., lambda q: -6 * self.k_star * (q - self.q_star)**5])
         elif self.HW == 'nad':
             self.VHW = lambda q: np.piecewise(q, [q >= self.q_star, q < self.q_star], [lambda q: 0., lambda q: self.k_star * (q - self.q_star)**6])
-            self.FHW = lambda q: np.piecewise(q, [q <= self.q_star, q > self.q_star], [lambda q: 0., lambda q: -6 * self.k_star * (q - self.q_star)**5])
+            self.FHW = lambda q: np.piecewise(q, [q >= self.q_star, q < self.q_star], [lambda q: 0., lambda q: -6 * self.k_star * (q - self.q_star)**5])
         else:
             self.VHW = lambda q: 0.
             self.FHW = lambda q: 0.
